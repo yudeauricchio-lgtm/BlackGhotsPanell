@@ -29,6 +29,10 @@ local showFps = false
 local tpEnabled = false
 local toggleKey = Enum.KeyCode.Insert
 local switchTargetKey = Enum.KeyCode.Insert
+local stickKey = Enum.KeyCode.LeftAlt
+local stickModeActive = false
+local stickKeyIsKeyboard = true
+local stickPressed = false
 local currentTitleColor = Color3.fromRGB(0, 0, 0)
 local savedPosition = nil
 local panelLoaded = false
@@ -45,11 +49,14 @@ local MinimizedFrame = nil
 local ColorMenu = nil
 local KeyMenu = nil
 local AimbotKeyMenu = nil
+local StickKeyMenu = nil
 local ChangeColorButton = nil
 local ChangeKeyButton = nil
 local ChangeAimbotKeyButton = nil
+local ChangeStickKeyButton = nil
 local CurrentKeyButton = nil
 local CurrentAimbotKeyButton = nil
+local CurrentStickKeyButton = nil
 local CurrentColorButton = nil
 
 local targetPartsList = {"Head", "HumanoidRootPart"}
@@ -58,8 +65,8 @@ local currentTargetIndex = 1
 local function showNotification(message, color)
     if not ScreenGui then return end
     local notif = Instance.new("Frame", ScreenGui)
-    notif.Size = UDim2.new(0, 300, 0, 40)
-    notif.Position = UDim2.new(0.5, -150, 0.8, 0)
+    notif.Size = UDim2.new(0, 250, 0, 35)
+    notif.Position = UDim2.new(0.5, -125, 0.8, 0)
     notif.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     notif.BackgroundTransparency = 0.2
     notif.BorderSizePixel = 0
@@ -71,7 +78,7 @@ local function showNotification(message, color)
     textLabel.Text = message
     textLabel.TextColor3 = color or Color3.fromRGB(255, 0, 0)
     textLabel.Font = Enum.Font.GothamBlack
-    textLabel.TextSize = 14
+    textLabel.TextSize = 12
     textLabel.TextScaled = true
     task.delay(2, function()
         local fadeOut = TweenService:Create(notif, TweenInfo.new(0.5), {BackgroundTransparency = 1})
@@ -91,9 +98,9 @@ local function createFPSDisplay()
     fpsLabel.Center = false
     fpsLabel.Outline = false
     fpsLabel.Font = 2
-    fpsLabel.Size = 16
+    fpsLabel.Size = 14
     fpsLabel.Color = Color3.fromRGB(255, 0, 0)
-    fpsLabel.Position = Vector2.new(Camera.ViewportSize.X - 60, 15)
+    fpsLabel.Position = Vector2.new(Camera.ViewportSize.X - 55, 15)
 end
 
 local function createFPSGhosts()
@@ -108,7 +115,7 @@ local function createFPSGhosts()
         ghost.Center = true
         ghost.Outline = false
         ghost.Font = 2
-        ghost.Size = 12
+        ghost.Size = 10
         ghost.Color = Color3.fromRGB(255, 0, 0)
         ghost.Text = "👻"
         table.insert(fpsGhosts, ghost)
@@ -117,10 +124,10 @@ end
 
 local function updateFPSGhosts()
     if not showFps or not fpsLabel then return end
-    local centerX = Camera.ViewportSize.X - 60
+    local centerX = Camera.ViewportSize.X - 55
     local centerY = 15
     local angles = {0, 90, 180, 270}
-    local radius = 35
+    local radius = 30
     for i, ghost in ipairs(fpsGhosts) do
         local angle = math.rad(angles[i] + (tick() * 50) % 360)
         local x = centerX + math.cos(angle) * radius
@@ -139,7 +146,7 @@ local function updateFPS()
         if fpsLabel and showFps then
             fpsLabel.Color = Color3.fromRGB(255, 0, 0)
             fpsLabel.Text = string.format("FPS: %d", currentFps)
-            fpsLabel.Position = Vector2.new(Camera.ViewportSize.X - 60, 15)
+            fpsLabel.Position = Vector2.new(Camera.ViewportSize.X - 55, 15)
             updateFPSGhosts()
         end
     end
@@ -185,21 +192,21 @@ local function applyGlitchEffect(frame, duration)
             return
         end
         if frame.Visible then
-            local offsetX = math.random(-8, 8)
-            local offsetY = math.random(-4, 4)
+            local offsetX = math.random(-6, 6)
+            local offsetY = math.random(-3, 3)
             frame.Position = UDim2.new(originalPosition.X.Scale, originalPosition.X.Offset + offsetX, 
                                        originalPosition.Y.Scale, originalPosition.Y.Offset + offsetY)
-            local widthOffset = math.random(-5, 5)
-            local heightOffset = math.random(-3, 3)
+            local widthOffset = math.random(-4, 4)
+            local heightOffset = math.random(-2, 2)
             frame.Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset + widthOffset,
                                    originalSize.Y.Scale, originalSize.Y.Offset + heightOffset)
             for _, glitch in ipairs(glitchFrames) do
                 if math.random(1, 3) == 1 then
                     glitch.Visible = true
-                    glitch.Position = UDim2.new(originalPosition.X.Scale, originalPosition.X.Offset + math.random(-15, 15),
-                                               originalPosition.Y.Scale, originalPosition.Y.Offset + math.random(-10, 10))
-                    glitch.Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset + math.random(-20, 20),
-                                           originalSize.Y.Scale, originalSize.Y.Offset + math.random(-10, 10))
+                    glitch.Position = UDim2.new(originalPosition.X.Scale, originalPosition.X.Offset + math.random(-12, 12),
+                                               originalPosition.Y.Scale, originalPosition.Y.Offset + math.random(-8, 8))
+                    glitch.Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset + math.random(-15, 15),
+                                           originalSize.Y.Scale, originalSize.Y.Offset + math.random(-8, 8))
                     glitch.BackgroundColor3 = math.random(1, 2) == 1 and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 0, 0)
                     glitch.BackgroundTransparency = math.random(30, 70) / 100
                     task.delay(0.05, function()
@@ -225,6 +232,7 @@ local function toggleMinimize()
         if ColorMenu then ColorMenu.Visible = false end
         if KeyMenu then KeyMenu.Visible = false end
         if AimbotKeyMenu then AimbotKeyMenu.Visible = false end
+        if StickKeyMenu then StickKeyMenu.Visible = false end
     else
         applyGlitchEffect(MinimizedFrame, 0.2)
         task.wait(0.15)
@@ -247,14 +255,14 @@ end
 
 local function getFontSizeByDistance(distance)
     local clampedDistance = math.clamp(distance, 5, 150)
-    local size = 16 - (clampedDistance - 5) * (8 / 145)
-    return math.max(8, math.min(16, size))
+    local size = 14 - (clampedDistance - 5) * (6 / 145)
+    return math.max(7, math.min(14, size))
 end
 
 local function getLifeFontSizeByDistance(distance)
     local clampedDistance = math.clamp(distance, 5, 200)
-    local size = 16 - (clampedDistance - 5) * (8 / 195)
-    return math.max(7, math.min(16, size))
+    local size = 14 - (clampedDistance - 5) * (6 / 195)
+    return math.max(6, math.min(14, size))
 end
 
 local function isPlayerAlive(player)
@@ -292,7 +300,7 @@ local TITLE_COLORS = {
     {Nome = "Ciano", Cor = Color3.fromRGB(0, 206, 209)},
     {Nome = "Branco", Cor = Color3.fromRGB(255, 255, 255)},
     {Nome = "Cinza", Cor = Color3.fromRGB(128, 128, 128)},
-    {Nome = "RGB", Cor = nil}
+    {Nome = "RGB", Cor = Color3.fromRGB(255, 0, 0)}
 }
 
 ScreenGui = Instance.new("ScreenGui")
@@ -322,40 +330,40 @@ DarkOverlay.BorderSizePixel = 0
 DarkOverlay.ZIndex = 99
 
 local LoadingContainer = Instance.new("Frame", ScreenGui)
-LoadingContainer.Size = UDim2.new(1, 0, 0, 80)
-LoadingContainer.Position = UDim2.new(0, 0, 1, -80)
+LoadingContainer.Size = UDim2.new(1, 0, 0, 60)
+LoadingContainer.Position = UDim2.new(0, 0, 1, -60)
 LoadingContainer.BackgroundTransparency = 0
 LoadingContainer.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 LoadingContainer.ZIndex = 101
 
 local PercentText = Instance.new("TextLabel", LoadingContainer)
 PercentText.Text = "0%"
-PercentText.Size = UDim2.new(0, 100, 1, 0)
-PercentText.Position = UDim2.new(0, 20, 0, 0)
+PercentText.Size = UDim2.new(0, 80, 1, 0)
+PercentText.Position = UDim2.new(0, 15, 0, 0)
 PercentText.BackgroundTransparency = 1
 PercentText.TextColor3 = Color3.fromRGB(255, 0, 0)
 PercentText.Font = Enum.Font.GothamBlack
-PercentText.TextSize = 28
+PercentText.TextSize = 22
 PercentText.TextXAlignment = Enum.TextXAlignment.Left
 
 local LoadingLabel = Instance.new("TextLabel", LoadingContainer)
 LoadingLabel.Text = "CARREGANDO BLACK GHOST PANEL"
-LoadingLabel.Size = UDim2.new(0, 350, 0, 30)
-LoadingLabel.Position = UDim2.new(0, 130, 0, 0)
+LoadingLabel.Size = UDim2.new(0, 280, 0, 25)
+LoadingLabel.Position = UDim2.new(0, 105, 0, 0)
 LoadingLabel.BackgroundTransparency = 1
 LoadingLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
 LoadingLabel.Font = Enum.Font.GothamBlack
-LoadingLabel.TextSize = 14
+LoadingLabel.TextSize = 12
 LoadingLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local LoadingBg = Instance.new("Frame", LoadingContainer)
-LoadingBg.Size = UDim2.new(1, -150, 0, 8)
-LoadingBg.Position = UDim2.new(0, 130, 0, 40)
+LoadingBg.Size = UDim2.new(1, -130, 0, 6)
+LoadingBg.Position = UDim2.new(0, 105, 0, 30)
 LoadingBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 LoadingBg.BorderSizePixel = 0
 
 local LoadingBgCorner = Instance.new("UICorner", LoadingBg)
-LoadingBgCorner.CornerRadius = UDim.new(0, 4)
+LoadingBgCorner.CornerRadius = UDim.new(0, 3)
 
 local LoadingBar = Instance.new("Frame", LoadingBg)
 LoadingBar.Size = UDim2.new(0, 0, 1, 0)
@@ -363,16 +371,16 @@ LoadingBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 LoadingBar.BorderSizePixel = 0
 
 local LoadingBarCorner = Instance.new("UICorner", LoadingBar)
-LoadingBarCorner.CornerRadius = UDim.new(0, 4)
+LoadingBarCorner.CornerRadius = UDim.new(0, 3)
 
 local GhostText = Instance.new("TextLabel", ScreenGui)
 GhostText.Text = "BLACK GHOST PANEL"
-GhostText.Size = UDim2.new(0, 500, 0, 80)
-GhostText.Position = UDim2.new(0.5, -250, 0.5, -40)
+GhostText.Size = UDim2.new(0, 400, 0, 60)
+GhostText.Position = UDim2.new(0.5, -200, 0.5, -30)
 GhostText.BackgroundTransparency = 1
 GhostText.TextColor3 = Color3.fromRGB(255, 0, 0)
 GhostText.Font = Enum.Font.GothamBlack
-GhostText.TextSize = 36
+GhostText.TextSize = 28
 GhostText.TextScaled = true
 GhostText.ZIndex = 200
 GhostText.Visible = false
@@ -381,11 +389,11 @@ local textGhosts = {}
 for i = 1, 8 do
     local ghost = Instance.new("TextLabel", ScreenGui)
     ghost.Text = "👻"
-    ghost.Size = UDim2.new(0, 30, 0, 30)
+    ghost.Size = UDim2.new(0, 24, 0, 24)
     ghost.BackgroundTransparency = 1
     ghost.TextColor3 = Color3.fromRGB(255, 0, 0)
     ghost.Font = Enum.Font.GothamBlack
-    ghost.TextSize = 24
+    ghost.TextSize = 20
     ghost.Visible = false
     ghost.ZIndex = 199
     table.insert(textGhosts, ghost)
@@ -399,14 +407,14 @@ local function startTextGhostAnimation()
         if GhostText and GhostText.Visible then
             local centerX = 0.5
             local centerY = 0.5
-            local radiusX = 0.35
-            local radiusY = 0.2
+            local radiusX = 0.3
+            local radiusY = 0.18
             angle = angle + 0.02
             for i, ghost in ipairs(textGhosts) do
                 local ghostAngle = angle + (i * math.pi * 2 / #textGhosts)
                 local x = centerX + math.cos(ghostAngle) * radiusX
                 local y = centerY + math.sin(ghostAngle) * radiusY
-                ghost.Position = UDim2.new(x, -15, y, -20)
+                ghost.Position = UDim2.new(x, -12, y, -15)
                 ghost.Visible = true
             end
         else
@@ -420,8 +428,8 @@ end
 startTextGhostAnimation()
 
 local ghostFrame = Instance.new("Frame", ScreenGui)
-ghostFrame.Size = UDim2.new(0, 280, 0, 340)
-ghostFrame.Position = UDim2.new(0, -290, 0.5, -170)
+ghostFrame.Size = UDim2.new(0, 200, 0, 250)
+ghostFrame.Position = UDim2.new(0, -210, 0.5, -125)
 ghostFrame.BackgroundTransparency = 1
 ghostFrame.ZIndex = 100
 
@@ -436,8 +444,8 @@ local ghostBodyCorner = Instance.new("UICorner", ghostBody)
 ghostBodyCorner.CornerRadius = UDim.new(0.5, 0)
 
 local leftEye = Instance.new("Frame", ghostBody)
-leftEye.Size = UDim2.new(0.2, 0, 0.25, 0)
-leftEye.Position = UDim2.new(0.22, 0, 0.3, 0)
+leftEye.Size = UDim2.new(0.2, 0, 0.2, 0)
+leftEye.Position = UDim2.new(0.22, 0, 0.32, 0)
 leftEye.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 leftEye.BorderSizePixel = 0
 
@@ -454,8 +462,8 @@ local leftPupilCorner = Instance.new("UICorner", leftPupil)
 leftPupilCorner.CornerRadius = UDim.new(1, 0)
 
 local rightEye = Instance.new("Frame", ghostBody)
-rightEye.Size = UDim2.new(0.2, 0, 0.25, 0)
-rightEye.Position = UDim2.new(0.58, 0, 0.3, 0)
+rightEye.Size = UDim2.new(0.2, 0, 0.2, 0)
+rightEye.Position = UDim2.new(0.58, 0, 0.32, 0)
 rightEye.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 rightEye.BorderSizePixel = 0
 
@@ -472,8 +480,8 @@ local rightPupilCorner = Instance.new("UICorner", rightPupil)
 rightPupilCorner.CornerRadius = UDim.new(1, 0)
 
 local mouth = Instance.new("Frame", ghostBody)
-mouth.Size = UDim2.new(0.3, 0, 0.18, 0)
-mouth.Position = UDim2.new(0.35, 0, 0.6, 0)
+mouth.Size = UDim2.new(0.25, 0, 0.15, 0)
+mouth.Position = UDim2.new(0.375, 0, 0.6, 0)
 mouth.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mouth.BorderSizePixel = 0
 
@@ -482,13 +490,13 @@ mouthCorner.CornerRadius = UDim.new(0.5, 0)
 
 for i = 1, 5 do
     local tail = Instance.new("Frame", ghostFrame)
-    tail.Size = UDim2.new(0.18, 0, 0.15, 0)
-    tail.Position = UDim2.new(0.03 + (i-1) * 0.235, 0, 0.85, 0)
+    tail.Size = UDim2.new(0.16, 0, 0.12, 0)
+    tail.Position = UDim2.new(0.04 + (i-1) * 0.23, 0, 0.87, 0)
     tail.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     tail.BackgroundTransparency = 0.1
     tail.BorderSizePixel = 0
     local tailCorner = Instance.new("UICorner", tail)
-    tailCorner.CornerRadius = UDim.new(1, 15)
+    tailCorner.CornerRadius = UDim.new(1, 12)
 end
 
 local ghostGlow = Instance.new("Frame", ghostFrame)
@@ -511,18 +519,18 @@ local function startFloating()
         if ghostFrame and ghostFrame.Parent then
             local currentY = ghostFrame.Position.Y.Offset
             if floatUpwards then
-                ghostFrame.Position = UDim2.new(ghostFrame.Position.X.Scale, ghostFrame.Position.X.Offset, 0.5, currentY - 0.4)
-                if currentY <= -185 then floatUpwards = false end
+                ghostFrame.Position = UDim2.new(ghostFrame.Position.X.Scale, ghostFrame.Position.X.Offset, 0.5, currentY - 0.3)
+                if currentY <= -140 then floatUpwards = false end
             else
-                ghostFrame.Position = UDim2.new(ghostFrame.Position.X.Scale, ghostFrame.Position.X.Offset, 0.5, currentY + 0.4)
-                if currentY >= -155 then floatUpwards = true end
+                ghostFrame.Position = UDim2.new(ghostFrame.Position.X.Scale, ghostFrame.Position.X.Offset, 0.5, currentY + 0.3)
+                if currentY >= -110 then floatUpwards = true end
             end
         end
     end)
 end
 
 local ghostTween = TweenService:Create(ghostFrame, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), {
-    Position = UDim2.new(1, 50, 0.5, -170)
+    Position = UDim2.new(1, 40, 0.5, -125)
 })
 
 local function showGhostText()
@@ -551,8 +559,8 @@ ghostTween:Play()
 startFloating()
 
 MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 540, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -270, 0.5, -250)
+MainFrame.Size = UDim2.new(0, 480, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -210)
 MainFrame.BackgroundColor3 = COLORS.PRIMARY
 MainFrame.BackgroundTransparency = 1
 MainFrame.BorderSizePixel = 0
@@ -561,11 +569,11 @@ MainFrame.Draggable = false
 MainFrame.Visible = false
 
 local MainFrameCorner = Instance.new("UICorner", MainFrame)
-MainFrameCorner.CornerRadius = UDim.new(0, 12)
+MainFrameCorner.CornerRadius = UDim.new(0, 10)
 
 local Shadow = Instance.new("ImageLabel", MainFrame)
-Shadow.Size = UDim2.new(1, 30, 1, 30)
-Shadow.Position = UDim2.new(0, -15, 0, -15)
+Shadow.Size = UDim2.new(1, 20, 1, 20)
+Shadow.Position = UDim2.new(0, -10, 0, -10)
 Shadow.BackgroundTransparency = 1
 Shadow.Image = "rbxassetid://5028857084"
 Shadow.ImageColor3 = Color3.new(0, 0, 0)
@@ -575,22 +583,22 @@ Shadow.ImageTransparency = 0.5
 Shadow.ZIndex = 0
 
 local TitleBar = Instance.new("Frame", MainFrame)
-TitleBar.Size = UDim2.new(1, 0, 0, 45)
+TitleBar.Size = UDim2.new(1, 0, 0, 38)
 TitleBar.BackgroundColor3 = currentTitleColor
 TitleBar.BorderSizePixel = 0
 TitleBar.Active = true
 
 local TitleBarCorner = Instance.new("UICorner", TitleBar)
-TitleBarCorner.CornerRadius = UDim.new(0, 12)
+TitleBarCorner.CornerRadius = UDim.new(0, 10)
 
 local Title = Instance.new("TextLabel", TitleBar)
 Title.Text = "Black Ghost Panel"
 Title.Size = UDim2.new(0.5, 0, 1, 0)
-Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Position = UDim2.new(0, 12, 0, 0)
 Title.BackgroundTransparency = 1
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBlack
-Title.TextSize = 16
+Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
 local CreditText = Instance.new("TextLabel", TitleBar)
@@ -600,28 +608,28 @@ CreditText.Position = UDim2.new(0.5, 0, 0, 0)
 CreditText.BackgroundTransparency = 1
 CreditText.TextColor3 = Color3.fromRGB(255, 0, 0)
 CreditText.Font = Enum.Font.GothamBlack
-CreditText.TextSize = 12
+CreditText.TextSize = 10
 CreditText.TextXAlignment = Enum.TextXAlignment.Left
 
 local SecondCreditText = Instance.new("TextLabel", TitleBar)
 SecondCreditText.Text = "zks_frozen"
 SecondCreditText.Size = UDim2.new(0.3, 0, 1, 0)
-SecondCreditText.Position = UDim2.new(0.5, 0, 0, 16)
+SecondCreditText.Position = UDim2.new(0.5, 0, 0, 13)
 SecondCreditText.BackgroundTransparency = 1
 SecondCreditText.TextColor3 = Color3.fromRGB(255, 0, 0)
 SecondCreditText.Font = Enum.Font.GothamBlack
-SecondCreditText.TextSize = 12
+SecondCreditText.TextSize = 10
 SecondCreditText.TextXAlignment = Enum.TextXAlignment.Left
 
 local MinimizeButton = Instance.new("TextButton", TitleBar)
-MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
-MinimizeButton.Position = UDim2.new(1, -40, 0.5, -15)
+MinimizeButton.Size = UDim2.new(0, 26, 0, 26)
+MinimizeButton.Position = UDim2.new(1, -34, 0.5, -13)
 MinimizeButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 MinimizeButton.BorderSizePixel = 0
 MinimizeButton.Text = ""
 
 local MinimizeCorner = Instance.new("UICorner", MinimizeButton)
-MinimizeCorner.CornerRadius = UDim.new(0, 6)
+MinimizeCorner.CornerRadius = UDim.new(0, 5)
 
 local MinimizeIcon = Instance.new("TextLabel", MinimizeButton)
 MinimizeIcon.Text = "+"
@@ -630,7 +638,7 @@ MinimizeIcon.Position = UDim2.new(0, 0, 0, 0)
 MinimizeIcon.BackgroundTransparency = 1
 MinimizeIcon.TextColor3 = Color3.fromRGB(255, 0, 0)
 MinimizeIcon.Font = Enum.Font.GothamBlack
-MinimizeIcon.TextSize = 24
+MinimizeIcon.TextSize = 20
 MinimizeIcon.TextScaled = true
 
 local draggingPanel = false
@@ -654,19 +662,25 @@ UserInputService.InputChanged:Connect(function(input)
         if ColorMenu and ColorMenu.Visible then
             local buttonPos = ChangeColorButton and ChangeColorButton.AbsolutePosition
             if buttonPos then
-                ColorMenu.Position = UDim2.new(0, buttonPos.X - 150, 0, buttonPos.Y + 35)
+                ColorMenu.Position = UDim2.new(0, buttonPos.X - 130, 0, buttonPos.Y + 30)
             end
         end
         if KeyMenu and KeyMenu.Visible then
             local buttonPos = ChangeKeyButton and ChangeKeyButton.AbsolutePosition
             if buttonPos then
-                KeyMenu.Position = UDim2.new(0, buttonPos.X - 150, 0, buttonPos.Y + 35)
+                KeyMenu.Position = UDim2.new(0, buttonPos.X - 130, 0, buttonPos.Y + 30)
             end
         end
         if AimbotKeyMenu and AimbotKeyMenu.Visible then
             local buttonPos = ChangeAimbotKeyButton and ChangeAimbotKeyButton.AbsolutePosition
             if buttonPos then
-                AimbotKeyMenu.Position = UDim2.new(0, buttonPos.X - 150, 0, buttonPos.Y + 35)
+                AimbotKeyMenu.Position = UDim2.new(0, buttonPos.X - 130, 0, buttonPos.Y + 30)
+            end
+        end
+        if StickKeyMenu and StickKeyMenu.Visible then
+            local buttonPos = ChangeStickKeyButton and ChangeStickKeyButton.AbsolutePosition
+            if buttonPos then
+                StickKeyMenu.Position = UDim2.new(0, buttonPos.X - 130, 0, buttonPos.Y + 30)
             end
         end
     end
@@ -679,8 +693,8 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 MinimizedFrame = Instance.new("Frame", ScreenGui)
-MinimizedFrame.Size = UDim2.new(0, 50, 0, 50)
-MinimizedFrame.Position = UDim2.new(0.5, -25, 0.5, -25)
+MinimizedFrame.Size = UDim2.new(0, 45, 0, 45)
+MinimizedFrame.Position = UDim2.new(0.5, -22, 0.5, -22)
 MinimizedFrame.BackgroundColor3 = currentTitleColor
 MinimizedFrame.BorderSizePixel = 0
 MinimizedFrame.Visible = false
@@ -688,7 +702,7 @@ MinimizedFrame.Active = true
 MinimizedFrame.Draggable = true
 
 local MinimizedCorner = Instance.new("UICorner", MinimizedFrame)
-MinimizedCorner.CornerRadius = UDim.new(0, 25)
+MinimizedCorner.CornerRadius = UDim.new(0, 22)
 
 local MinimizedGhost = Instance.new("TextLabel", MinimizedFrame)
 MinimizedGhost.Text = "👻"
@@ -696,7 +710,7 @@ MinimizedGhost.Size = UDim2.new(1, 0, 1, 0)
 MinimizedGhost.BackgroundTransparency = 1
 MinimizedGhost.TextColor3 = Color3.fromRGB(255, 0, 0)
 MinimizedGhost.Font = Enum.Font.GothamBlack
-MinimizedGhost.TextSize = 30
+MinimizedGhost.TextSize = 26
 MinimizedGhost.TextScaled = true
 
 MinimizeButton.MouseButton1Click:Connect(toggleMinimize)
@@ -738,8 +752,8 @@ MinimizedFrame.InputBegan:Connect(function(input)
 end)
 
 local ContentContainer = Instance.new("Frame", MainFrame)
-ContentContainer.Size = UDim2.new(1, -20, 1, -160)
-ContentContainer.Position = UDim2.new(0, 10, 0, 50)
+ContentContainer.Size = UDim2.new(1, -16, 1, -170)
+ContentContainer.Position = UDim2.new(0, 8, 0, 42)
 ContentContainer.BackgroundTransparency = 1
 ContentContainer.BorderSizePixel = 0
 
@@ -750,7 +764,7 @@ LeftColumn.BackgroundTransparency = 1
 LeftColumn.BorderSizePixel = 0
 
 local LeftListLayout = Instance.new("UIListLayout", LeftColumn)
-LeftListLayout.Padding = UDim.new(0, 6)
+LeftListLayout.Padding = UDim.new(0, 4)
 LeftListLayout.FillDirection = Enum.FillDirection.Vertical
 LeftListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 LeftListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
@@ -762,7 +776,7 @@ MiddleColumn.BackgroundTransparency = 1
 MiddleColumn.BorderSizePixel = 0
 
 local MiddleListLayout = Instance.new("UIListLayout", MiddleColumn)
-MiddleListLayout.Padding = UDim.new(0, 6)
+MiddleListLayout.Padding = UDim.new(0, 4)
 MiddleListLayout.FillDirection = Enum.FillDirection.Vertical
 MiddleListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 MiddleListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
@@ -774,103 +788,288 @@ RightColumn.BackgroundTransparency = 1
 RightColumn.BorderSizePixel = 0
 
 local RightListLayout = Instance.new("UIListLayout", RightColumn)
-RightListLayout.Padding = UDim.new(0, 6)
+RightListLayout.Padding = UDim.new(0, 4)
 RightListLayout.FillDirection = Enum.FillDirection.Vertical
 RightListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 RightListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 
+-- ===== PAINEL DE TECLA DE GRUDAR =====
+local StickKeyPanel = Instance.new("Frame", MainFrame)
+StickKeyPanel.Size = UDim2.new(1, -16, 0, 35)
+StickKeyPanel.BackgroundColor3 = COLORS.SECONDARY
+StickKeyPanel.BorderSizePixel = 0
+
+local StickKeyPanelCorner = Instance.new("UICorner", StickKeyPanel)
+StickKeyPanelCorner.CornerRadius = UDim.new(0, 8)
+
+local StickKeyLabel = Instance.new("TextLabel", StickKeyPanel)
+StickKeyLabel.Text = "Tecla grudar:"
+StickKeyLabel.Size = UDim2.new(0, 130, 1, 0)
+StickKeyLabel.Position = UDim2.new(0, 8, 0, 0)
+StickKeyLabel.BackgroundTransparency = 1
+StickKeyLabel.TextColor3 = COLORS.TEXT
+StickKeyLabel.Font = Enum.Font.GothamBlack
+StickKeyLabel.TextSize = 10
+StickKeyLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+CurrentStickKeyButton = Instance.new("TextButton", StickKeyPanel)
+CurrentStickKeyButton.Size = UDim2.new(0, 70, 0, 24)
+CurrentStickKeyButton.Position = UDim2.new(0, 142, 0.5, -12)
+CurrentStickKeyButton.BackgroundColor3 = currentTitleColor
+CurrentStickKeyButton.BorderSizePixel = 0
+CurrentStickKeyButton.Text = "LeftAlt"
+CurrentStickKeyButton.TextColor3 = Color3.new(1, 1, 1)
+CurrentStickKeyButton.Font = Enum.Font.GothamBlack
+CurrentStickKeyButton.TextSize = 10
+
+local CurrentStickKeyCorner = Instance.new("UICorner", CurrentStickKeyButton)
+CurrentStickKeyCorner.CornerRadius = UDim.new(0, 5)
+
+ChangeStickKeyButton = Instance.new("TextButton", StickKeyPanel)
+ChangeStickKeyButton.Size = UDim2.new(0, 50, 0, 24)
+ChangeStickKeyButton.Position = UDim2.new(0, 218, 0.5, -12)
+ChangeStickKeyButton.BackgroundColor3 = currentTitleColor
+ChangeStickKeyButton.BorderSizePixel = 0
+ChangeStickKeyButton.Text = "Mudar"
+ChangeStickKeyButton.TextColor3 = Color3.new(1, 1, 1)
+ChangeStickKeyButton.Font = Enum.Font.GothamBlack
+ChangeStickKeyButton.TextSize = 10
+
+local ChangeStickKeyCorner = Instance.new("UICorner", ChangeStickKeyButton)
+ChangeStickKeyCorner.CornerRadius = UDim.new(0, 5)
+
+-- ===== MENU DE TECLA DE GRUDAR =====
+StickKeyMenu = Instance.new("Frame", ScreenGui)
+StickKeyMenu.Size = UDim2.new(0, 220, 0, 100)
+StickKeyMenu.BackgroundColor3 = COLORS.PRIMARY
+StickKeyMenu.BorderSizePixel = 0
+StickKeyMenu.BackgroundTransparency = 0.15
+StickKeyMenu.Visible = false
+StickKeyMenu.ZIndex = 10
+
+local StickKeyMenuCorner = Instance.new("UICorner", StickKeyMenu)
+StickKeyMenuCorner.CornerRadius = UDim.new(0, 7)
+
+local StickKeyMenuTitle = Instance.new("TextLabel", StickKeyMenu)
+StickKeyMenuTitle.Text = "Pressione uma tecla..."
+StickKeyMenuTitle.Size = UDim2.new(1, 0, 0, 32)
+StickKeyMenuTitle.Position = UDim2.new(0, 0, 0, 0)
+StickKeyMenuTitle.BackgroundColor3 = currentTitleColor
+StickKeyMenuTitle.TextColor3 = Color3.new(1, 1, 1)
+StickKeyMenuTitle.Font = Enum.Font.GothamBlack
+StickKeyMenuTitle.TextSize = 12
+StickKeyMenuTitle.TextXAlignment = Enum.TextXAlignment.Center
+
+local StickKeyMenuCorner2 = Instance.new("UICorner", StickKeyMenuTitle)
+StickKeyMenuCorner2.CornerRadius = UDim.new(0, 7)
+
+local StickKeyMenuSub = Instance.new("TextLabel", StickKeyMenu)
+StickKeyMenuSub.Text = "Aguardando tecla..."
+StickKeyMenuSub.Size = UDim2.new(1, 0, 0, 25)
+StickKeyMenuSub.Position = UDim2.new(0, 0, 0, 42)
+StickKeyMenuSub.BackgroundTransparency = 1
+StickKeyMenuSub.TextColor3 = COLORS.TEXT
+StickKeyMenuSub.Font = Enum.Font.GothamBlack
+StickKeyMenuSub.TextSize = 11
+StickKeyMenuSub.TextXAlignment = Enum.TextXAlignment.Center
+
+-- ===== FUNÇÕES DO MENU DE TECLA DE GRUDAR =====
+local waitingForStickKey = false
+local stickKeyConnection = nil
+
+local function closeStickKeyMenu()
+    StickKeyMenu.Visible = false
+    if stickKeyConnection then
+        stickKeyConnection:Disconnect()
+        stickKeyConnection = nil
+    end
+    waitingForStickKey = false
+end
+
+ChangeStickKeyButton.MouseButton1Click:Connect(function()
+    if StickKeyMenu.Visible then
+        closeStickKeyMenu()
+    else
+        StickKeyMenu.Visible = true
+        if stickKeyConnection then stickKeyConnection:Disconnect() end
+        waitingForStickKey = true
+        StickKeyMenuTitle.Text = "Pressione uma tecla..."
+        StickKeyMenuTitle.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+        stickKeyConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if waitingForStickKey then
+                local key = input.KeyCode
+                local userInputType = input.UserInputType
+                
+                if key ~= Enum.KeyCode.Unknown then
+                    stickKey = key
+                    stickKeyIsKeyboard = true
+                    CurrentStickKeyButton.Text = tostring(key):gsub("Enum.KeyCode.", "")
+                    StickKeyMenuTitle.Text = "Tecla selecionada!"
+                    StickKeyMenuTitle.BackgroundColor3 = currentTitleColor
+                    waitingForStickKey = false
+                    task.wait(0.5)
+                    closeStickKeyMenu()
+                    showNotification("🔒 Tecla grudar alterada!", Color3.fromRGB(0, 255, 0))
+                elseif userInputType == Enum.UserInputType.MouseButton1 or 
+                       userInputType == Enum.UserInputType.MouseButton2 or
+                       userInputType == Enum.UserInputType.MouseButton3 then
+                    stickKey = userInputType
+                    stickKeyIsKeyboard = false
+                    local buttonNames = {
+                        [Enum.UserInputType.MouseButton1] = "Mouse1",
+                        [Enum.UserInputType.MouseButton2] = "Mouse2",
+                        [Enum.UserInputType.MouseButton3] = "Mouse3"
+                    }
+                    CurrentStickKeyButton.Text = buttonNames[userInputType] or "Mouse"
+                    StickKeyMenuTitle.Text = "Tecla selecionada!"
+                    StickKeyMenuTitle.BackgroundColor3 = currentTitleColor
+                    waitingForStickKey = false
+                    task.wait(0.5)
+                    closeStickKeyMenu()
+                    showNotification("🔒 Tecla grudar alterada!", Color3.fromRGB(0, 255, 0))
+                end
+            end
+        end)
+    end
+end)
+
+-- ===== PAINEL DE COR =====
+local ColorPanel = Instance.new("Frame", MainFrame)
+ColorPanel.Size = UDim2.new(1, -16, 0, 35)
+ColorPanel.BackgroundColor3 = COLORS.SECONDARY
+ColorPanel.BorderSizePixel = 0
+
+local ColorPanelCorner = Instance.new("UICorner", ColorPanel)
+ColorPanelCorner.CornerRadius = UDim.new(0, 8)
+
+local ColorLabel = Instance.new("TextLabel", ColorPanel)
+ColorLabel.Text = "Cor do Topo:"
+ColorLabel.Size = UDim2.new(0, 70, 1, 0)
+ColorLabel.Position = UDim2.new(0, 8, 0, 0)
+ColorLabel.BackgroundTransparency = 1
+ColorLabel.TextColor3 = COLORS.TEXT
+ColorLabel.Font = Enum.Font.GothamBlack
+ColorLabel.TextSize = 10
+ColorLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+CurrentColorButton = Instance.new("TextButton", ColorPanel)
+CurrentColorButton.Size = UDim2.new(0, 40, 0, 24)
+CurrentColorButton.Position = UDim2.new(0, 82, 0.5, -12)
+CurrentColorButton.BackgroundColor3 = currentTitleColor
+CurrentColorButton.BorderSizePixel = 0
+CurrentColorButton.Text = ""
+CurrentColorButton.AutoButtonColor = false
+
+local CurrentColorCorner = Instance.new("UICorner", CurrentColorButton)
+CurrentColorCorner.CornerRadius = UDim.new(0, 5)
+
+ChangeColorButton = Instance.new("TextButton", ColorPanel)
+ChangeColorButton.Size = UDim2.new(0, 50, 0, 24)
+ChangeColorButton.Position = UDim2.new(0, 130, 0.5, -12)
+ChangeColorButton.BackgroundColor3 = currentTitleColor
+ChangeColorButton.BorderSizePixel = 0
+ChangeColorButton.Text = "Mudar"
+ChangeColorButton.TextColor3 = Color3.new(1, 1, 1)
+ChangeColorButton.Font = Enum.Font.GothamBlack
+ChangeColorButton.TextSize = 10
+
+local ChangeColorCorner = Instance.new("UICorner", ChangeColorButton)
+ChangeColorCorner.CornerRadius = UDim.new(0, 5)
+
+-- ===== PAINEL DE TECLA DE MINIMIZAR =====
 local KeyPanel = Instance.new("Frame", MainFrame)
-KeyPanel.Size = UDim2.new(1, -20, 0, 45)
-KeyPanel.Position = UDim2.new(0, 10, 1, -105)
+KeyPanel.Size = UDim2.new(1, -16, 0, 35)
 KeyPanel.BackgroundColor3 = COLORS.SECONDARY
 KeyPanel.BorderSizePixel = 0
 
 local KeyPanelCorner = Instance.new("UICorner", KeyPanel)
-KeyPanelCorner.CornerRadius = UDim.new(0, 10)
+KeyPanelCorner.CornerRadius = UDim.new(0, 8)
 
 local KeyLabel = Instance.new("TextLabel", KeyPanel)
-KeyLabel.Text = "Tecla para minimizar:"
-KeyLabel.Size = UDim2.new(0, 150, 1, 0)
-KeyLabel.Position = UDim2.new(0, 10, 0, 0)
+KeyLabel.Text = "Tecla minimizar:"
+KeyLabel.Size = UDim2.new(0, 130, 1, 0)
+KeyLabel.Position = UDim2.new(0, 8, 0, 0)
 KeyLabel.BackgroundTransparency = 1
 KeyLabel.TextColor3 = COLORS.TEXT
 KeyLabel.Font = Enum.Font.GothamBlack
-KeyLabel.TextSize = 11
+KeyLabel.TextSize = 10
 KeyLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 CurrentKeyButton = Instance.new("TextButton", KeyPanel)
-CurrentKeyButton.Size = UDim2.new(0, 80, 0, 28)
-CurrentKeyButton.Position = UDim2.new(0, 165, 0.5, -14)
+CurrentKeyButton.Size = UDim2.new(0, 70, 0, 24)
+CurrentKeyButton.Position = UDim2.new(0, 142, 0.5, -12)
 CurrentKeyButton.BackgroundColor3 = currentTitleColor
 CurrentKeyButton.BorderSizePixel = 0
 CurrentKeyButton.Text = "Insert"
 CurrentKeyButton.TextColor3 = Color3.new(1, 1, 1)
 CurrentKeyButton.Font = Enum.Font.GothamBlack
-CurrentKeyButton.TextSize = 11
+CurrentKeyButton.TextSize = 10
 
 local CurrentKeyCorner = Instance.new("UICorner", CurrentKeyButton)
-CurrentKeyCorner.CornerRadius = UDim.new(0, 6)
+CurrentKeyCorner.CornerRadius = UDim.new(0, 5)
 
 ChangeKeyButton = Instance.new("TextButton", KeyPanel)
-ChangeKeyButton.Size = UDim2.new(0, 60, 0, 28)
-ChangeKeyButton.Position = UDim2.new(0, 255, 0.5, -14)
+ChangeKeyButton.Size = UDim2.new(0, 50, 0, 24)
+ChangeKeyButton.Position = UDim2.new(0, 218, 0.5, -12)
 ChangeKeyButton.BackgroundColor3 = currentTitleColor
 ChangeKeyButton.BorderSizePixel = 0
 ChangeKeyButton.Text = "Mudar"
 ChangeKeyButton.TextColor3 = Color3.new(1, 1, 1)
 ChangeKeyButton.Font = Enum.Font.GothamBlack
-ChangeKeyButton.TextSize = 11
+ChangeKeyButton.TextSize = 10
 
 local ChangeKeyCorner = Instance.new("UICorner", ChangeKeyButton)
-ChangeKeyCorner.CornerRadius = UDim.new(0, 6)
+ChangeKeyCorner.CornerRadius = UDim.new(0, 5)
 
+-- ===== PAINEL DE TECLA DE TROCAR ALVO =====
 local AimbotKeyPanel = Instance.new("Frame", MainFrame)
-AimbotKeyPanel.Size = UDim2.new(1, -20, 0, 45)
-AimbotKeyPanel.Position = UDim2.new(0, 10, 1, -55)
+AimbotKeyPanel.Size = UDim2.new(1, -16, 0, 35)
 AimbotKeyPanel.BackgroundColor3 = COLORS.SECONDARY
 AimbotKeyPanel.BorderSizePixel = 0
 
 local AimbotKeyPanelCorner = Instance.new("UICorner", AimbotKeyPanel)
-AimbotKeyPanelCorner.CornerRadius = UDim.new(0, 10)
+AimbotKeyPanelCorner.CornerRadius = UDim.new(0, 8)
 
 local AimbotKeyLabel = Instance.new("TextLabel", AimbotKeyPanel)
 AimbotKeyLabel.Text = "Tecla trocar alvo:"
-AimbotKeyLabel.Size = UDim2.new(0, 150, 1, 0)
-AimbotKeyLabel.Position = UDim2.new(0, 10, 0, 0)
+AimbotKeyLabel.Size = UDim2.new(0, 130, 1, 0)
+AimbotKeyLabel.Position = UDim2.new(0, 8, 0, 0)
 AimbotKeyLabel.BackgroundTransparency = 1
 AimbotKeyLabel.TextColor3 = COLORS.TEXT
 AimbotKeyLabel.Font = Enum.Font.GothamBlack
-AimbotKeyLabel.TextSize = 11
+AimbotKeyLabel.TextSize = 10
 AimbotKeyLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 CurrentAimbotKeyButton = Instance.new("TextButton", AimbotKeyPanel)
-CurrentAimbotKeyButton.Size = UDim2.new(0, 80, 0, 28)
-CurrentAimbotKeyButton.Position = UDim2.new(0, 165, 0.5, -14)
+CurrentAimbotKeyButton.Size = UDim2.new(0, 70, 0, 24)
+CurrentAimbotKeyButton.Position = UDim2.new(0, 142, 0.5, -12)
 CurrentAimbotKeyButton.BackgroundColor3 = currentTitleColor
 CurrentAimbotKeyButton.BorderSizePixel = 0
 CurrentAimbotKeyButton.Text = "Insert"
 CurrentAimbotKeyButton.TextColor3 = Color3.new(1, 1, 1)
 CurrentAimbotKeyButton.Font = Enum.Font.GothamBlack
-CurrentAimbotKeyButton.TextSize = 11
+CurrentAimbotKeyButton.TextSize = 10
 
 local CurrentAimbotKeyCorner = Instance.new("UICorner", CurrentAimbotKeyButton)
-CurrentAimbotKeyCorner.CornerRadius = UDim.new(0, 6)
+CurrentAimbotKeyCorner.CornerRadius = UDim.new(0, 5)
 
 ChangeAimbotKeyButton = Instance.new("TextButton", AimbotKeyPanel)
-ChangeAimbotKeyButton.Size = UDim2.new(0, 60, 0, 28)
-ChangeAimbotKeyButton.Position = UDim2.new(0, 255, 0.5, -14)
+ChangeAimbotKeyButton.Size = UDim2.new(0, 50, 0, 24)
+ChangeAimbotKeyButton.Position = UDim2.new(0, 218, 0.5, -12)
 ChangeAimbotKeyButton.BackgroundColor3 = currentTitleColor
 ChangeAimbotKeyButton.BorderSizePixel = 0
 ChangeAimbotKeyButton.Text = "Mudar"
 ChangeAimbotKeyButton.TextColor3 = Color3.new(1, 1, 1)
 ChangeAimbotKeyButton.Font = Enum.Font.GothamBlack
-ChangeAimbotKeyButton.TextSize = 11
+ChangeAimbotKeyButton.TextSize = 10
 
 local ChangeAimbotKeyCorner = Instance.new("UICorner", ChangeAimbotKeyButton)
-ChangeAimbotKeyCorner.CornerRadius = UDim.new(0, 6)
+ChangeAimbotKeyCorner.CornerRadius = UDim.new(0, 5)
 
+-- ===== MENUS DE TECLA =====
 KeyMenu = Instance.new("Frame", ScreenGui)
-KeyMenu.Size = UDim2.new(0, 250, 0, 120)
+KeyMenu.Size = UDim2.new(0, 220, 0, 100)
 KeyMenu.BackgroundColor3 = COLORS.PRIMARY
 KeyMenu.BorderSizePixel = 0
 KeyMenu.BackgroundTransparency = 0.15
@@ -878,33 +1077,33 @@ KeyMenu.Visible = false
 KeyMenu.ZIndex = 10
 
 local KeyMenuCorner = Instance.new("UICorner", KeyMenu)
-KeyMenuCorner.CornerRadius = UDim.new(0, 8)
+KeyMenuCorner.CornerRadius = UDim.new(0, 7)
 
 local KeyMenuTitle = Instance.new("TextLabel", KeyMenu)
 KeyMenuTitle.Text = "Pressione uma tecla..."
-KeyMenuTitle.Size = UDim2.new(1, 0, 0, 40)
+KeyMenuTitle.Size = UDim2.new(1, 0, 0, 32)
 KeyMenuTitle.Position = UDim2.new(0, 0, 0, 0)
 KeyMenuTitle.BackgroundColor3 = currentTitleColor
 KeyMenuTitle.TextColor3 = Color3.new(1, 1, 1)
 KeyMenuTitle.Font = Enum.Font.GothamBlack
-KeyMenuTitle.TextSize = 14
+KeyMenuTitle.TextSize = 12
 KeyMenuTitle.TextXAlignment = Enum.TextXAlignment.Center
 
 local KeyMenuCorner2 = Instance.new("UICorner", KeyMenuTitle)
-KeyMenuCorner2.CornerRadius = UDim.new(0, 8)
+KeyMenuCorner2.CornerRadius = UDim.new(0, 7)
 
 local KeyMenuSub = Instance.new("TextLabel", KeyMenu)
 KeyMenuSub.Text = "Aguardando tecla..."
-KeyMenuSub.Size = UDim2.new(1, 0, 0, 30)
-KeyMenuSub.Position = UDim2.new(0, 0, 0, 50)
+KeyMenuSub.Size = UDim2.new(1, 0, 0, 25)
+KeyMenuSub.Position = UDim2.new(0, 0, 0, 42)
 KeyMenuSub.BackgroundTransparency = 1
 KeyMenuSub.TextColor3 = COLORS.TEXT
 KeyMenuSub.Font = Enum.Font.GothamBlack
-KeyMenuSub.TextSize = 12
+KeyMenuSub.TextSize = 11
 KeyMenuSub.TextXAlignment = Enum.TextXAlignment.Center
 
 AimbotKeyMenu = Instance.new("Frame", ScreenGui)
-AimbotKeyMenu.Size = UDim2.new(0, 250, 0, 120)
+AimbotKeyMenu.Size = UDim2.new(0, 220, 0, 100)
 AimbotKeyMenu.BackgroundColor3 = COLORS.PRIMARY
 AimbotKeyMenu.BorderSizePixel = 0
 AimbotKeyMenu.BackgroundTransparency = 0.15
@@ -912,31 +1111,32 @@ AimbotKeyMenu.Visible = false
 AimbotKeyMenu.ZIndex = 10
 
 local AimbotKeyMenuCorner = Instance.new("UICorner", AimbotKeyMenu)
-AimbotKeyMenuCorner.CornerRadius = UDim.new(0, 8)
+AimbotKeyMenuCorner.CornerRadius = UDim.new(0, 7)
 
 local AimbotKeyMenuTitle = Instance.new("TextLabel", AimbotKeyMenu)
 AimbotKeyMenuTitle.Text = "Pressione uma tecla..."
-AimbotKeyMenuTitle.Size = UDim2.new(1, 0, 0, 40)
+AimbotKeyMenuTitle.Size = UDim2.new(1, 0, 0, 32)
 AimbotKeyMenuTitle.Position = UDim2.new(0, 0, 0, 0)
 AimbotKeyMenuTitle.BackgroundColor3 = currentTitleColor
 AimbotKeyMenuTitle.TextColor3 = Color3.new(1, 1, 1)
 AimbotKeyMenuTitle.Font = Enum.Font.GothamBlack
-AimbotKeyMenuTitle.TextSize = 14
+AimbotKeyMenuTitle.TextSize = 12
 AimbotKeyMenuTitle.TextXAlignment = Enum.TextXAlignment.Center
 
 local AimbotKeyMenuCorner2 = Instance.new("UICorner", AimbotKeyMenuTitle)
-AimbotKeyMenuCorner2.CornerRadius = UDim.new(0, 8)
+AimbotKeyMenuCorner2.CornerRadius = UDim.new(0, 7)
 
 local AimbotKeyMenuSub = Instance.new("TextLabel", AimbotKeyMenu)
 AimbotKeyMenuSub.Text = "Aguardando tecla..."
-AimbotKeyMenuSub.Size = UDim2.new(1, 0, 0, 30)
-AimbotKeyMenuSub.Position = UDim2.new(0, 0, 0, 50)
+AimbotKeyMenuSub.Size = UDim2.new(1, 0, 0, 25)
+AimbotKeyMenuSub.Position = UDim2.new(0, 0, 0, 42)
 AimbotKeyMenuSub.BackgroundTransparency = 1
 AimbotKeyMenuSub.TextColor3 = COLORS.TEXT
 AimbotKeyMenuSub.Font = Enum.Font.GothamBlack
-AimbotKeyMenuSub.TextSize = 12
+AimbotKeyMenuSub.TextSize = 11
 AimbotKeyMenuSub.TextXAlignment = Enum.TextXAlignment.Center
 
+-- ===== FUNÇÕES DOS MENUS DE TECLA =====
 local waitingForKey = false
 local keyConnection = nil
 
@@ -970,7 +1170,7 @@ ChangeKeyButton.MouseButton1Click:Connect(function()
                     waitingForKey = false
                     task.wait(0.5)
                     closeKeyMenu()
-                    showNotification("⌨️ Tecla de minimizar alterada!", Color3.fromRGB(255, 0, 0))
+                    showNotification("⌨️ Tecla minimizar alterada!", Color3.fromRGB(255, 0, 0))
                 end
             end
         end)
@@ -1010,66 +1210,42 @@ ChangeAimbotKeyButton.MouseButton1Click:Connect(function()
                     waitingForAimbotKey = false
                     task.wait(0.5)
                     closeAimbotKeyMenu()
-                    showNotification("🔫 Tecla de troca de alvo alterada!", Color3.fromRGB(255, 0, 0))
+                    showNotification("🔫 Tecla trocar alvo alterada!", Color3.fromRGB(255, 0, 0))
                 end
             end
         end)
     end
 end)
 
-local ColorPanel = Instance.new("Frame", MainFrame)
-ColorPanel.Size = UDim2.new(1, -20, 0, 45)
-ColorPanel.Position = UDim2.new(0, 10, 1, -160)
-ColorPanel.BackgroundColor3 = COLORS.SECONDARY
-ColorPanel.BorderSizePixel = 0
-
-local ColorPanelCorner = Instance.new("UICorner", ColorPanel)
-ColorPanelCorner.CornerRadius = UDim.new(0, 10)
-
-local ColorLabel = Instance.new("TextLabel", ColorPanel)
-ColorLabel.Text = "Cor do Topo:"
-ColorLabel.Size = UDim2.new(0, 80, 1, 0)
-ColorLabel.Position = UDim2.new(0, 10, 0, 0)
-ColorLabel.BackgroundTransparency = 1
-ColorLabel.TextColor3 = COLORS.TEXT
-ColorLabel.Font = Enum.Font.GothamBlack
-ColorLabel.TextSize = 11
-ColorLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-CurrentColorButton = Instance.new("TextButton", ColorPanel)
-CurrentColorButton.Size = UDim2.new(0, 50, 0, 28)
-CurrentColorButton.Position = UDim2.new(0, 95, 0.5, -14)
-CurrentColorButton.BackgroundColor3 = currentTitleColor
-CurrentColorButton.BorderSizePixel = 0
-CurrentColorButton.Text = ""
-CurrentColorButton.AutoButtonColor = false
-
-local CurrentColorCorner = Instance.new("UICorner", CurrentColorButton)
-CurrentColorCorner.CornerRadius = UDim.new(0, 6)
-
-ChangeColorButton = Instance.new("TextButton", ColorPanel)
-ChangeColorButton.Size = UDim2.new(0, 60, 0, 28)
-ChangeColorButton.Position = UDim2.new(0, 155, 0.5, -14)
-ChangeColorButton.BackgroundColor3 = currentTitleColor
-ChangeColorButton.BorderSizePixel = 0
-ChangeColorButton.Text = "Mudar"
-ChangeColorButton.TextColor3 = Color3.new(1, 1, 1)
-ChangeColorButton.Font = Enum.Font.GothamBlack
-ChangeColorButton.TextSize = 11
-
-local ChangeColorCorner = Instance.new("UICorner", ChangeColorButton)
-ChangeColorCorner.CornerRadius = UDim.new(0, 6)
-
+-- ===== SISTEMA DE DETECÇÃO DE TECLA DE GRUDAR =====
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
+    
     if input.KeyCode == toggleKey then
         toggleMinimize()
     end
+    
     if input.KeyCode == switchTargetKey then
         currentTargetIndex = currentTargetIndex % #targetPartsList + 1
         targetPart = targetPartsList[currentTargetIndex]
-        showNotification("🎯 Alvo alterado para: " .. targetPart, Color3.fromRGB(255, 0, 0))
+        showNotification("🎯 Alvo: " .. targetPart, Color3.fromRGB(255, 0, 0))
     end
+    
+    if stickKeyIsKeyboard and input.KeyCode == stickKey then
+        stickModeActive = not stickModeActive
+        if stickModeActive then
+            showNotification("🔒 Aimbot grudado!", Color3.fromRGB(0, 255, 0))
+        else
+            showNotification("🔓 Aimbot desgrudado!", Color3.fromRGB(255, 0, 0))
+        end
+    end
+    
+    if not stickKeyIsKeyboard and input.UserInputType == stickKey then
+        stickPressed = true
+        stickModeActive = true
+        showNotification("🔒 Aimbot grudado!", Color3.fromRGB(0, 255, 0))
+    end
+    
     if tpEnabled and input.UserInputType == Enum.UserInputType.MouseButton1 then
         local ctrlPressed = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
         if ctrlPressed then
@@ -1078,6 +1254,17 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if not stickKeyIsKeyboard and input.UserInputType == stickKey then
+        stickPressed = false
+        stickModeActive = false
+        showNotification("🔓 Aimbot desgrudado!", Color3.fromRGB(255, 0, 0))
+    end
+end)
+
+-- ===== FUNÇÕES DE COR =====
 local visualSection = nil
 local aimbotSection = nil
 local extraSection = nil
@@ -1094,7 +1281,7 @@ local function updateCategoryColors()
     if visualSection then
         visualSection.TextColor3 = anyVisualActive and GREEN_COLOR or RED_COLOR
     end
-    local anyAimbotActive = aimbotEnabled or showFov
+    local anyAimbotActive = aimbotEnabled or showFov or stickModeActive
     if aimbotSection then
         aimbotSection.TextColor3 = anyAimbotActive and GREEN_COLOR or RED_COLOR
     end
@@ -1113,6 +1300,8 @@ local function updateAllDynamicColors(color)
     ChangeKeyButton.BackgroundColor3 = color
     CurrentAimbotKeyButton.BackgroundColor3 = color
     ChangeAimbotKeyButton.BackgroundColor3 = color
+    CurrentStickKeyButton.BackgroundColor3 = color
+    ChangeStickKeyButton.BackgroundColor3 = color
     MinimizeButton.BackgroundColor3 = Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7)
     if colorMenuTitle then
         colorMenuTitle.BackgroundColor3 = color
@@ -1122,6 +1311,9 @@ local function updateAllDynamicColors(color)
     end
     if AimbotKeyMenuTitle then
         AimbotKeyMenuTitle.BackgroundColor3 = color
+    end
+    if StickKeyMenuTitle then
+        StickKeyMenuTitle.BackgroundColor3 = color
     end
     for _, button in pairs(selectorButtons) do
         pcall(function() button.BackgroundColor3 = color end)
@@ -1155,8 +1347,9 @@ local function stopRgbMode()
     usingRgb = false
 end
 
+-- ===== MENU DE CORES =====
 ColorMenu = Instance.new("Frame", ScreenGui)
-ColorMenu.Size = UDim2.new(0, 220, 0, 400)
+ColorMenu.Size = UDim2.new(0, 190, 0, 340)
 ColorMenu.BackgroundColor3 = COLORS.PRIMARY
 ColorMenu.BorderSizePixel = 0
 ColorMenu.BackgroundTransparency = 0.15
@@ -1164,43 +1357,43 @@ ColorMenu.Visible = false
 ColorMenu.ZIndex = 10
 
 local ColorMenuCorner = Instance.new("UICorner", ColorMenu)
-ColorMenuCorner.CornerRadius = UDim.new(0, 8)
+ColorMenuCorner.CornerRadius = UDim.new(0, 7)
 
 colorMenuTitle = Instance.new("TextLabel", ColorMenu)
 colorMenuTitle.Text = "Selecione uma cor"
-colorMenuTitle.Size = UDim2.new(1, 0, 0, 30)
+colorMenuTitle.Size = UDim2.new(1, 0, 0, 28)
 colorMenuTitle.BackgroundColor3 = currentTitleColor
 colorMenuTitle.TextColor3 = Color3.new(1, 1, 1)
 colorMenuTitle.Font = Enum.Font.GothamBlack
-colorMenuTitle.TextSize = 14
+colorMenuTitle.TextSize = 12
 colorMenuTitle.TextXAlignment = Enum.TextXAlignment.Center
 
 local ColorMenuCorner2 = Instance.new("UICorner", colorMenuTitle)
-ColorMenuCorner2.CornerRadius = UDim.new(0, 8)
+ColorMenuCorner2.CornerRadius = UDim.new(0, 7)
 
 local ColorList = Instance.new("ScrollingFrame", ColorMenu)
-ColorList.Size = UDim2.new(1, -10, 1, -40)
-ColorList.Position = UDim2.new(0, 5, 0, 35)
+ColorList.Size = UDim2.new(1, -8, 1, -36)
+ColorList.Position = UDim2.new(0, 4, 0, 32)
 ColorList.BackgroundTransparency = 1
 ColorList.BorderSizePixel = 0
-ColorList.ScrollBarThickness = 4
+ColorList.ScrollBarThickness = 3
 ColorList.ScrollingEnabled = true
 
 local ColorListLayout = Instance.new("UIListLayout", ColorList)
-ColorListLayout.Padding = UDim.new(0, 5)
+ColorListLayout.Padding = UDim.new(0, 4)
 ColorListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 for i, colorData in ipairs(TITLE_COLORS) do
     local colorButton = Instance.new("TextButton", ColorList)
-    colorButton.Size = UDim2.new(1, -10, 0, 35)
+    colorButton.Size = UDim2.new(1, -8, 0, 30)
     colorButton.BackgroundColor3 = colorData.Cor or DEFAULT_ACCENT
     colorButton.BorderSizePixel = 0
     colorButton.Text = colorData.Nome
     colorButton.TextColor3 = (colorData.Nome == "Preto" or colorData.Nome == "Roxo") and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(0, 0, 0)
     colorButton.Font = Enum.Font.GothamBlack
-    colorButton.TextSize = 12
+    colorButton.TextSize = 11
     local colorCorner = Instance.new("UICorner", colorButton)
-    colorCorner.CornerRadius = UDim.new(0, 4)
+    colorCorner.CornerRadius = UDim.new(0, 3)
     colorButton.MouseButton1Click:Connect(function()
         if colorData.Nome == "RGB" then
             startRgbMode()
@@ -1213,7 +1406,7 @@ for i, colorData in ipairs(TITLE_COLORS) do
 end
 
 task.wait()
-ColorList.CanvasSize = UDim2.new(0, 0, 0, ColorListLayout.AbsoluteContentSize.Y + 10)
+ColorList.CanvasSize = UDim2.new(0, 0, 0, ColorListLayout.AbsoluteContentSize.Y + 8)
 
 local function closeColorMenu()
     ColorMenu.Visible = false
@@ -1223,10 +1416,11 @@ ChangeColorButton.MouseButton1Click:Connect(function()
     ColorMenu.Visible = not ColorMenu.Visible
     if ColorMenu.Visible then
         local buttonPos = ChangeColorButton.AbsolutePosition
-        ColorMenu.Position = UDim2.new(0, buttonPos.X - 150, 0, buttonPos.Y - 200)
+        ColorMenu.Position = UDim2.new(0, buttonPos.X - 130, 0, buttonPos.Y - 170)
     end
 end)
 
+-- ===== FECHAR MENUS AO CLICAR FORA =====
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -1266,42 +1460,69 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 end
             end
         end
+        if StickKeyMenu and StickKeyMenu.Visible then
+            local mousePos = UserInputService:GetMouseLocation()
+            local menuPos = StickKeyMenu.AbsolutePosition
+            local menuSize = StickKeyMenu.AbsoluteSize
+            if not (mousePos.X >= menuPos.X and mousePos.X <= menuPos.X + menuSize.X and
+                   mousePos.Y >= menuPos.Y and mousePos.Y <= menuPos.Y + menuSize.Y) then
+                if not (mousePos.X >= ChangeStickKeyButton.AbsolutePosition.X and mousePos.X <= ChangeStickKeyButton.AbsolutePosition.X + ChangeStickKeyButton.AbsoluteSize.X and
+                       mousePos.Y >= ChangeStickKeyButton.AbsolutePosition.Y and mousePos.Y <= ChangeStickKeyButton.AbsolutePosition.Y + ChangeStickKeyButton.AbsoluteSize.Y) then
+                    closeStickKeyMenu()
+                end
+            end
+        end
     end
 end)
 
+-- ===== REPOSICIONAR PAINÉIS =====
+local panels = {
+    ColorPanel,
+    KeyPanel,
+    AimbotKeyPanel,
+    StickKeyPanel
+}
+
+for i = #panels, 1, -1 do
+    local panel = panels[i]
+    local index = i - 1
+    panel.Position = UDim2.new(0, 8, 1, -42 - (index * 38))
+end
+
+-- ===== FUNÇÕES DE CRIAÇÃO DE UI =====
 local function createSection(parent, name)
     local label = Instance.new("TextLabel", parent)
     label.Text = name
-    label.Size = UDim2.new(1, 0, 0, 28)
+    label.Size = UDim2.new(1, 0, 0, 24)
     label.BackgroundTransparency = 1
     label.TextColor3 = RED_COLOR
     label.Font = Enum.Font.GothamBlack
-    label.TextSize = 14
+    label.TextSize = 12
     label.TextXAlignment = Enum.TextXAlignment.Center
     return label
 end
 
 local function createToggleButton(parent, name, getState, onToggle)
     local button = Instance.new("Frame", parent)
-    button.Size = UDim2.new(1, 0, 0, 32)
+    button.Size = UDim2.new(1, 0, 0, 28)
     button.BackgroundColor3 = COLORS.SECONDARY
     button.BorderSizePixel = 0
     local UICorner = Instance.new("UICorner", button)
-    UICorner.CornerRadius = UDim.new(0, 6)
+    UICorner.CornerRadius = UDim.new(0, 5)
     local statusIndicator = Instance.new("Frame", button)
-    statusIndicator.Size = UDim2.new(0, 14, 0, 14)
-    statusIndicator.Position = UDim2.new(0, 8, 0.5, -7)
+    statusIndicator.Size = UDim2.new(0, 12, 0, 12)
+    statusIndicator.Position = UDim2.new(0, 6, 0.5, -6)
     statusIndicator.BorderSizePixel = 0
     local statusCorner = Instance.new("UICorner", statusIndicator)
-    statusCorner.CornerRadius = UDim.new(0, 7)
+    statusCorner.CornerRadius = UDim.new(0, 6)
     local label = Instance.new("TextLabel", button)
     label.Text = name
-    label.Size = UDim2.new(1, -40, 1, 0)
-    label.Position = UDim2.new(0, 30, 0, 0)
+    label.Size = UDim2.new(1, -34, 1, 0)
+    label.Position = UDim2.new(0, 24, 0, 0)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBlack
-    label.TextSize = 13
+    label.TextSize = 11
     label.TextXAlignment = Enum.TextXAlignment.Left
     local hitBox = Instance.new("TextButton", button)
     hitBox.Size = UDim2.new(1, 0, 1, 0)
@@ -1321,34 +1542,34 @@ end
 
 local function createSlider(parent, name, min, max, default, onChanged)
     local sliderContainer = Instance.new("Frame", parent)
-    sliderContainer.Size = UDim2.new(1, 0, 0, 48)
+    sliderContainer.Size = UDim2.new(1, 0, 0, 40)
     sliderContainer.BackgroundColor3 = COLORS.SECONDARY
     sliderContainer.BorderSizePixel = 0
     local UICorner = Instance.new("UICorner", sliderContainer)
-    UICorner.CornerRadius = UDim.new(0, 6)
+    UICorner.CornerRadius = UDim.new(0, 5)
     local label = Instance.new("TextLabel", sliderContainer)
     label.Text = name .. ": " .. default
-    label.Size = UDim2.new(1, -20, 0, 18)
-    label.Position = UDim2.new(0, 10, 0, 5)
+    label.Size = UDim2.new(1, -16, 0, 16)
+    label.Position = UDim2.new(0, 8, 0, 4)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBlack
-    label.TextSize = 12
+    label.TextSize = 10
     label.TextXAlignment = Enum.TextXAlignment.Left
     local sliderBg = Instance.new("Frame", sliderContainer)
-    sliderBg.Size = UDim2.new(1, -20, 0, 5)
-    sliderBg.Position = UDim2.new(0, 10, 0, 28)
+    sliderBg.Size = UDim2.new(1, -16, 0, 4)
+    sliderBg.Position = UDim2.new(0, 8, 0, 24)
     sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     sliderBg.BorderSizePixel = 0
     local sliderBgCorner = Instance.new("UICorner", sliderBg)
-    sliderBgCorner.CornerRadius = UDim.new(0, 3)
+    sliderBgCorner.CornerRadius = UDim.new(0, 2)
     local sliderFill = Instance.new("Frame", sliderBg)
     sliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     sliderFill.BackgroundColor3 = currentTitleColor
     sliderFill.BorderSizePixel = 0
     table.insert(sliderFills, sliderFill)
     local sliderFillCorner = Instance.new("UICorner", sliderFill)
-    sliderFillCorner.CornerRadius = UDim.new(0, 3)
+    sliderFillCorner.CornerRadius = UDim.new(0, 2)
     local currentValue = default
     local function updateSlider(input)
         local pos = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
@@ -1379,32 +1600,32 @@ end
 
 local function createSelector(parent, name, options, default, onChanged)
     local selector = Instance.new("Frame", parent)
-    selector.Size = UDim2.new(1, 0, 0, 60)
+    selector.Size = UDim2.new(1, 0, 0, 52)
     selector.BackgroundColor3 = COLORS.SECONDARY
     selector.BorderSizePixel = 0
     local UICorner = Instance.new("UICorner", selector)
-    UICorner.CornerRadius = UDim.new(0, 6)
+    UICorner.CornerRadius = UDim.new(0, 5)
     local label = Instance.new("TextLabel", selector)
     label.Text = name .. ": " .. options[default]
-    label.Size = UDim2.new(1, -20, 0, 22)
-    label.Position = UDim2.new(0, 10, 0, 6)
+    label.Size = UDim2.new(1, -16, 0, 18)
+    label.Position = UDim2.new(0, 8, 0, 4)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBlack
-    label.TextSize = 12
+    label.TextSize = 10
     label.TextXAlignment = Enum.TextXAlignment.Left
     local nextButton = Instance.new("TextButton", selector)
-    nextButton.Size = UDim2.new(0, 110, 0, 28)
-    nextButton.Position = UDim2.new(0.5, -55, 0, 34)
+    nextButton.Size = UDim2.new(0, 90, 0, 24)
+    nextButton.Position = UDim2.new(0.5, -45, 0, 28)
     nextButton.BackgroundColor3 = currentTitleColor
     nextButton.BorderSizePixel = 0
     nextButton.Text = "Mudar Parte"
     nextButton.TextColor3 = Color3.new(1, 1, 1)
     nextButton.Font = Enum.Font.GothamBlack
-    nextButton.TextSize = 12
+    nextButton.TextSize = 10
     table.insert(selectorButtons, nextButton)
     local nextButtonCorner = Instance.new("UICorner", nextButton)
-    nextButtonCorner.CornerRadius = UDim.new(0, 5)
+    nextButtonCorner.CornerRadius = UDim.new(0, 4)
     local currentIndex = default
     nextButton.MouseButton1Click:Connect(function()
         currentIndex = currentIndex % #options + 1
@@ -1414,6 +1635,7 @@ local function createSelector(parent, name, options, default, onChanged)
     return selector
 end
 
+-- ===== FUNÇÕES DE ESP =====
 local function cleanupLifeESP(player)
     local data = lifeObjects[player]
     if data then
@@ -1446,8 +1668,8 @@ local function updateLifeESP(player)
     local rootPart = character:FindFirstChild("HumanoidRootPart")
     if not humanoid or not rootPart then return end
     local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 50, 0, 20)
-    billboard.StudsOffset = Vector3.new(0, -3.5, 0)
+    billboard.Size = UDim2.new(0, 40, 0, 16)
+    billboard.StudsOffset = Vector3.new(0, -3, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = rootPart
     local mainFrame = Instance.new("Frame", billboard)
@@ -1458,13 +1680,13 @@ local function updateLifeESP(player)
     healthText.Position = UDim2.new(0, 0, 0, 0)
     healthText.BackgroundTransparency = 1
     healthText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    healthText.TextSize = 14
+    healthText.TextSize = 12
     healthText.Font = Enum.Font.GothamBlack
     healthText.TextXAlignment = Enum.TextXAlignment.Center
     healthText.TextYAlignment = Enum.TextYAlignment.Center
     local healthBar = Instance.new("Frame", mainFrame)
     healthBar.Size = UDim2.new(1, 0, 0, 3)
-    healthBar.Position = UDim2.new(0, 0, 1, -4)
+    healthBar.Position = UDim2.new(0, 0, 1, -3)
     healthBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     healthBar.BorderSizePixel = 0
     local healthFill = Instance.new("Frame", healthBar)
@@ -1579,14 +1801,14 @@ local function createESP(player)
     nameTag.Center = true
     nameTag.Outline = false
     nameTag.Font = 2
-    nameTag.Size = 14
+    nameTag.Size = 12
     nameTag.Color = getTeamColor(player)
     local distanceText = Drawing.new("Text")
     distanceText.Visible = false
     distanceText.Center = true
     distanceText.Outline = false
     distanceText.Font = 2
-    distanceText.Size = 12
+    distanceText.Size = 10
     distanceText.Color = Color3.fromRGB(255, 255, 255)
     espObjects[player] = {
         nameTag = nameTag,
@@ -1641,7 +1863,7 @@ local function updateAllESP()
                         local displayDistance = math.floor(distance)
                         local fontSize = getFontSizeByDistance(distance)
                         if espNicksEnabled then
-                            esp.nameTag.Position = Vector2.new(headPos.X, headPos.Y - 35)
+                            esp.nameTag.Position = Vector2.new(headPos.X, headPos.Y - 30)
                             esp.nameTag.Text = player.Name
                             esp.nameTag.Size = fontSize
                             esp.nameTag.Visible = true
@@ -1649,9 +1871,9 @@ local function updateAllESP()
                             esp.nameTag.Visible = false
                         end
                         if espDistanceEnabled then
-                            esp.distanceText.Position = Vector2.new(headPos.X, headPos.Y - 20)
+                            esp.distanceText.Position = Vector2.new(headPos.X, headPos.Y - 18)
                             esp.distanceText.Text = displayDistance .. "m"
-                            esp.distanceText.Size = math.max(8, fontSize - 2)
+                            esp.distanceText.Size = math.max(7, fontSize - 2)
                             esp.distanceText.Visible = true
                         else
                             esp.distanceText.Visible = false
@@ -1738,6 +1960,7 @@ local function smoothLookAt(target)
     Camera.CFrame = lerpCFrame
 end
 
+-- ===== CRIAÇÃO DOS BOTÕES =====
 visualSection = createSection(LeftColumn, "VISUALIZAÇÃO")
 createToggleButton(LeftColumn, "ESP", function() return espEnabled end, function() 
     espEnabled = not espEnabled
@@ -1776,7 +1999,7 @@ createSlider(MiddleColumn, "FOV", 50, 500, fovRadius, function(value)
     fovRadius = value
     if fovCircle then fovCircle.Radius = value end
 end)
-createSlider(MiddleColumn, "Suavização Aimbot", 0, 10, smoothingFactor * 10, function(value)
+createSlider(MiddleColumn, "Suavização", 0, 10, smoothingFactor * 10, function(value)
     smoothingFactor = value / 10
 end)
 createSelector(MiddleColumn, "Parte Alvo", targetPartsList, currentTargetIndex, function(value)
@@ -1802,11 +2025,12 @@ createToggleButton(RightColumn, "Mostrar FPS", function() return showFps end, fu
     end
     updateCategoryColors()
 end)
-createToggleButton(RightColumn, "TP (Ctrl + Click)", function() return tpEnabled end, function() 
+createToggleButton(RightColumn, "TP (Ctrl+Click)", function() return tpEnabled end, function() 
     tpEnabled = not tpEnabled
     updateCategoryColors()
 end)
 
+-- ===== LOADING =====
 local progress = 0
 local loadConnection = RunService.RenderStepped:Connect(function()
     if progress < 1 then
@@ -1844,10 +2068,11 @@ fadeDark.Completed:Connect(function()
         BackgroundTransparency = 0.1
     })
     fadePanel:Play()
-    showNotification("Black Ghost Panel carregado com sucesso👻", Color3.fromRGB(255, 0, 0))
+    showNotification("Black Ghost Panel carregado👻", Color3.fromRGB(255, 0, 0))
     panelLoaded = true
 end)
 
+-- ===== INICIALIZAÇÃO DOS PLAYERS =====
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         createESP(player)
@@ -1889,6 +2114,7 @@ Players.PlayerRemoving:Connect(function(player)
     cleanupLifeESP(player)
 end)
 
+-- ===== RENDER LOOP =====
 RunService.RenderStepped:Connect(function()
     if not panelLoaded then return end
     
@@ -1911,10 +2137,22 @@ RunService.RenderStepped:Connect(function()
         updateFPSGhosts()
     end
     
-    if aimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local target = getClosestPart()
-        if target then
-            smoothLookAt(target)
+    if aimbotEnabled then
+        local shouldAimbot = false
+        
+        if stickModeActive then
+            shouldAimbot = true
+        end
+        
+        if not stickModeActive and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+            shouldAimbot = true
+        end
+        
+        if shouldAimbot then
+            local target = getClosestPart()
+            if target then
+                smoothLookAt(target)
+            end
         end
     end
 end)
